@@ -1,0 +1,42 @@
+name: Build DOCX from Markdown
+
+on:
+  push:
+    paths:
+      - 'docs/VibeCode_School_TZ_v1.0.md'
+      - '.github/workflows/build-docx.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-docx:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Generate DOCX
+        run: |
+          pandoc docs/VibeCode_School_TZ_v1.0.md \
+            -o docs/VibeCode_School_TZ_v1.0.docx \
+            --from=gfm \
+            --standalone
+
+      - name: Commit generated DOCX
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/VibeCode_School_TZ_v1.0.docx
+          if git diff --cached --quiet; then
+            echo "DOCX unchanged"
+          else
+            git commit -m "Generate DOCX version of technical specification"
+            git push
+          fi
