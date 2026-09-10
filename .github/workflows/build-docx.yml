@@ -1,9 +1,9 @@
-name: Build DOCX from Markdown
+name: Build full MD and DOCX
 
 on:
   push:
     paths:
-      - 'docs/VibeCode_School_TZ_v1.0.md'
+      - '.staging/tz-full.md.gz.b64'
       - '.github/workflows/build-docx.yml'
   workflow_dispatch:
 
@@ -11,11 +11,16 @@ permissions:
   contents: write
 
 jobs:
-  build-docx:
+  build-docs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Restore full Markdown
+        run: |
+          mkdir -p docs
+          base64 -d .staging/tz-full.md.gz.b64 | gzip -d > docs/VibeCode_School_TZ_v1.0.md
 
       - name: Install Pandoc
         run: |
@@ -29,14 +34,14 @@ jobs:
             --from=gfm \
             --standalone
 
-      - name: Commit generated DOCX
+      - name: Commit full documents
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/VibeCode_School_TZ_v1.0.docx
+          git add docs/VibeCode_School_TZ_v1.0.md docs/VibeCode_School_TZ_v1.0.docx
           if git diff --cached --quiet; then
-            echo "DOCX unchanged"
+            echo "Documents unchanged"
           else
-            git commit -m "Generate DOCX version of technical specification"
+            git commit -m "Publish full VibeCode School technical specification"
             git push
           fi
