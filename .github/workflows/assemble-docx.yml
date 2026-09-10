@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   assemble:
-    if: ${{ hashFiles('.staging/ready') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,19 +36,19 @@ jobs:
           from pathlib import Path
           import zipfile
           p = Path('docs/VibeCode_School_TZ_v1.0.docx')
-          assert p.stat().st_size > 1000
+          assert p.stat().st_size == 49535, p.stat().st_size
           with zipfile.ZipFile(p) as z:
               assert '[Content_Types].xml' in z.namelist()
               assert 'word/document.xml' in z.namelist()
           print('DOCX OK:', p.stat().st_size, 'bytes')
           PY
-      - name: Commit DOCX and clean staging
+      - name: Commit DOCX
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .staging
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'Add DOCX specification and clean staging'
+          git add docs/VibeCode_School_TZ_v1.0.docx
+          git diff --cached --quiet && exit 0
+          git commit -m 'Add complete DOCX specification'
           git push
