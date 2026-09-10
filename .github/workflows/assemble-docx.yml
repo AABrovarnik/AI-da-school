@@ -1,0 +1,55 @@
+name: Assemble DOCX
+
+on:
+  push:
+    paths:
+      - '.staging/ready'
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    if: ${{ hashFiles('.staging/ready') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble and validate DOCX
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          cat \
+            .staging/docx.part00 \
+            .staging/docx.part01 \
+            .staging/docx.part02 \
+            .staging/docx.part03 \
+            .staging/docx.part04 \
+            .staging/docx.tail00 \
+            .staging/docx.tail01 \
+            .staging/docx.tail02 \
+            .staging/docx.tail03 \
+            .staging/docx.tail04 \
+            .staging/docx.tail05 \
+            .staging/docx.tail06 \
+            | base64 --decode > docs/VibeCode_School_TZ_v1.0.docx
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          p = Path('docs/VibeCode_School_TZ_v1.0.docx')
+          assert p.stat().st_size > 1000
+          with zipfile.ZipFile(p) as z:
+              assert '[Content_Types].xml' in z.namelist()
+              assert 'word/document.xml' in z.namelist()
+          print('DOCX OK:', p.stat().st_size, 'bytes')
+          PY
+      - name: Commit DOCX and clean staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .staging
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Add DOCX specification and clean staging'
+          git push
