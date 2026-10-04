@@ -26,26 +26,6 @@ npm run dev
 
 `npm run dev` одновременно запускает React/Vite frontend и Node.js/Express backend.
 
-## Основная структура
-
-```text
-AI-da-school/
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-├── index.html
-├── .env.example
-├── src/
-│   ├── main.tsx
-│   ├── App.tsx
-│   └── styles.css
-├── server/
-│   ├── index.ts
-│   └── tsconfig.json
-├── dev-package/
-└── docs/
-```
-
 ## Команды
 
 ```powershell
@@ -62,47 +42,42 @@ npm start         # запуск скомпилированного backend
 
 ```env
 PORT=3001
-GEMINI_API_KEY=
+OPENAI_API_KEY=
+APP_ENCRYPTION_KEY=replace-with-long-random-secret
+ADMIN_LOGIN=admin
+ADMIN_PASSWORD=Admin#12345
 ```
 
-Не публикуйте `.env` и Gemini API key в GitHub или frontend-коде.
+Не публикуйте `.env` и OpenAI API key в GitHub или frontend-коде.
 
-## Пакет разработки
+## Что уже реализовано
 
-Файлы для последовательной разработки в Google AI Studio находятся в `dev-package/`:
+- Публичный чат с отдельными диалогами (для гостя и для авторизованного клиента).
+- Админ-панель: обзор, редактирование черновика, тест ответа, публикация версии, статусы диалогов.
+- Авторизация с ролями `admin` и `client`, серверные проверки доступа.
+- Фиксированная модель runtime: `gpt-6-sol`.
+- Безопасное хранение ключа OpenAI (шифрование AES-256-GCM через `APP_ENCRYPTION_KEY`).
 
-- `MASTER_PROMPT.md`
-- `COURSE_START.md`
-- `COURSE_PRO.md`
-- `AI_TUTOR_PROMPT.md`
-- `UI_SPEC.md`
-- `DATABASE_SCHEMA.md`
-- `SAFETY.md`
-- `ROADMAP.md`
+### Демо-аккаунты
+
+- Администратор: логин из `ADMIN_LOGIN`, пароль из `ADMIN_PASSWORD`.
+- Тестовые клиенты: `demo-client-01` ... `demo-client-05`.
+- Пароль тестовых клиентов: `12345` (только для закрытого тестового контура).
 
 ## Главные ТЗ
 
 - Школа: `docs/VibeCode_School_TZ_v1.0.md`
 - Админка: `docs/TZ/2026-10-04_TZ_AI_admin_school_v1.3.md`
+
 ## Архив
 
 - Папка `docs/archive/` хранит устаревшие, альтернативные и служебные версии документов.
 - Актуальные рабочие спецификации всегда указаны в разделе **Главные ТЗ**.
-## Документы
 
-- `docs/VibeCode_School_TZ_v1.0.md` — полное техническое задание в Markdown.
-- `docs/VibeCode_School_TZ_v1.0.docx` — версия технического задания в Microsoft Word.
-
-### Новая структура документации
+## Структура документации
 
 - `docs/TZ/` — технические задания (утверждённые версии)
 - `docs/decisions/` — архитектурные и продуктовые решения
 - `docs/reports/` — отчёты по тестам, деплою, проверкам
 - `docs/templates/` — шаблоны документов
 - `docs/archive/` — устаревшие версии
-
-## Концепция
-
-Цель проекта — научить детей превращать идею в работающий цифровой продукт вместе с AI: формулировать задачу, писать промпты, создавать прототип, тестировать, находить и исправлять ошибки и развивать собственный проект.
-
-
