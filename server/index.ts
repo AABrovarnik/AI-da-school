@@ -24,6 +24,40 @@ type Session = {
   createdAt: string
 }
 
+type LearningProgramItem = {
+  id: string
+  title: string
+  description: string
+}
+
+type ModuleProgressItem = {
+  programId: string
+  completed: boolean
+}
+
+type StudentProfile = {
+  id: string
+  userId: string
+  nickname: string
+  fullName: string
+  legalRepresentative: string
+  email: string
+  contacts: string
+  progressPercent: number
+  progressNote: string
+  attentionNote: string
+  moduleProgress: ModuleProgressItem[]
+  updatedAt: string
+}
+
+type StudentHistoryItem = {
+  id: string
+  studentId: string
+  actorLogin: string
+  action: string
+  createdAt: string
+}
+
 type BusinessData = {
   name: string
   description: string
@@ -122,6 +156,7 @@ const port = Number(process.env.PORT ?? 3001)
 const dataDir = path.resolve(process.cwd(), 'server', 'data')
 const storePath = path.join(dataDir, 'store.json')
 const providerSecretPath = path.join(dataDir, 'provider-secret.json')
+const studentProfilesPath = path.join(dataDir, 'student-profiles.json')
 const cookieName = 'school_sid'
 const guestCookieName = 'school_gid'
 
@@ -293,10 +328,152 @@ const loadStore = (): AppStore => {
 
 let store = loadStore()
 
+const programCatalog: LearningProgramItem[] = [
+  { id: 'p1', title: 'Введение в вайб-кодинг', description: 'Как формулировать идею, цель и результат проекта.' },
+  { id: 'p2', title: 'Алгоритмическое мышление', description: 'Блок-схемы, условия, циклы на детских примерах.' },
+  { id: 'p3', title: 'Scratch: первые игры', description: 'Сцены, спрайты, события, очки и уровни.' },
+  { id: 'p4', title: 'UX для детей', description: 'Как сделать понятный интерфейс для пользователя.' },
+  { id: 'p5', title: 'HTML и структура сайта', description: 'Страницы, заголовки, карточки, ссылки.' },
+  { id: 'p6', title: 'CSS и стиль продукта', description: 'Цвета, отступы, сетка, адаптивность.' },
+  { id: 'p7', title: 'JavaScript-основы', description: 'Переменные, функции, работа с кнопками и формами.' },
+  { id: 'p8', title: 'Работа с AI-ассистентом', description: 'Промпты, проверка ответов, безопасное использование.' },
+  { id: 'p9', title: 'Отладка и исправление ошибок', description: 'Поиск багов и проверка гипотез.' },
+  { id: 'p10', title: 'Командная работа', description: 'Роли в команде и культура обратной связи.' },
+  { id: 'p11', title: 'Презентация проекта', description: 'Как показать ценность и результат своей работы.' },
+  { id: 'p12', title: 'Финальный демо-день', description: 'Подготовка и защита проекта перед родителями.' },
+];
+
+const normalizeModuleProgress = (source: unknown): ModuleProgressItem[] => {
+  const sourceMap = new Map<string, boolean>()
+  if (Array.isArray(source)) {
+    for (const item of source) {
+      if (!item || typeof item !== 'object') continue
+      const raw = item as Record<string, unknown>
+      const programId = String(raw.programId ?? '')
+      if (!programId) continue
+      sourceMap.set(programId, Boolean(raw.completed))
+    }
+  }
+  return programCatalog.map((program) => ({
+    programId: program.id,
+    completed: sourceMap.get(program.id) ?? false,
+  }))
+}
+
+const progressFromModules = (moduleProgress: ModuleProgressItem[]): number => {
+  if (moduleProgress.length === 0) return 0
+  const completed = moduleProgress.filter((item) => item.completed).length
+  return Math.round((completed / moduleProgress.length) * 100)
+}
+
+const buildStudentProfiles = (users: User[]): StudentProfile[] => {
+  const samples = [
+    { login: 'vasya', fullName: 'Василий Петров', rep: 'Петрова Ольга', email: 'vasya.parent@example.test', contacts: '@vasya_parent' },
+    { login: 'fedya', fullName: 'Фёдор Смирнов', rep: 'Смирнова Ирина', email: 'fedya.parent@example.test', contacts: '@fedya_parent' },
+    { login: 'sveta', fullName: 'Светлана Иванова', rep: 'Иванов Роман', email: 'sveta.parent@example.test', contacts: '@sveta_parent' },
+    { login: 'masha', fullName: 'Мария Кузнецова', rep: 'Кузнецова Анна', email: 'masha.parent@example.test', contacts: '@masha_parent' },
+    { login: 'petya', fullName: 'Пётр Соколов', rep: 'Соколова Елена', email: 'petya.parent@example.test', contacts: '@petya_parent' },
+  ]
+
+  const profiles: StudentProfile[] = []
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = samples[index]
+    const user = users.find((item) => item.login === sample.login && item.role === 'client')
+    if (!user) continue
+
+    const moduleProgress = normalizeModuleProgress(
+      programCatalog.map((program, moduleIndex) => ({ programId: program.id, completed: moduleIndex < 3 + index })),
+    )
+    const progressPercent = progressFromModules(moduleProgress)
+
+    profiles.push({
+      id: randomId(8),
+      userId: user.id,
+      nickname: sample.login,
+      fullName: sample.fullName,
+      legalRepresentative: sample.rep,
+      email: sample.email,
+      contacts: sample.contacts,
+      progressPercent,
+      progressNote: `Пройдено ${moduleProgress.filter((item) => item.completed).length} из ${moduleProgress.length} модулей.`,
+      attentionNote: 'Уделить внимание домашней практике и повторению базовых модулей.',
+      moduleProgress,
+      updatedAt: nowIso(),
+    })
+  }
+  return profiles
+}
+
+const loadStudentProfiles = (users: User[]): StudentProfile[] => {
+  if (fs.existsSync(studentProfilesPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(studentProfilesPath, 'utf8')) as StudentProfile[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        let changed = false
+        for (const student of parsed) {
+          const normalized = normalizeModuleProgress((student as Partial<StudentProfile>).moduleProgress)
+          if (JSON.stringify(normalized) !== JSON.stringify((student as Partial<StudentProfile>).moduleProgress ?? [])) {
+            student.moduleProgress = normalized
+            changed = true
+          }
+
+          const nextPercent = progressFromModules(student.moduleProgress)
+          if (student.progressPercent !== nextPercent) {
+            student.progressPercent = nextPercent
+            changed = true
+          }
+
+          const expectedNote = `Пройдено ${student.moduleProgress.filter((item) => item.completed).length} из ${student.moduleProgress.length} модулей.`
+          if (!student.progressNote || student.progressNote.includes('модул')) {
+            if (student.progressNote !== expectedNote) {
+              student.progressNote = expectedNote
+              changed = true
+            }
+          }
+        }
+        if (changed) fs.writeFileSync(studentProfilesPath, JSON.stringify(parsed, null, 2), 'utf8')
+        return parsed
+      }
+    } catch {
+      // ignore and regenerate
+    }
+  }
+
+  const generated = buildStudentProfiles(users)
+  fs.writeFileSync(studentProfilesPath, JSON.stringify(generated, null, 2), 'utf8')
+  return generated
+}
+
+const persistStudentProfiles = () => {
+  ensureDataDir()
+  fs.writeFileSync(studentProfilesPath, JSON.stringify(studentProfiles, null, 2), 'utf8')
+}
+
+const normalizeLegacyDemoLogins = () => {
+  const mapping = ['vasya', 'fedya', 'sveta', 'masha', 'petya']
+  let changed = false
+  for (let i = 1; i <= 5; i += 1) {
+    const legacy = `demo-client-0${i}`
+    const target = mapping[i - 1]
+    const user = store.users.find((item) => item.login === legacy)
+    if (!user) continue
+    if (store.users.some((item) => item.login === target)) continue
+    user.login = target
+    changed = true
+  }
+  if (changed) persistStore()
+}
+
+let studentProfiles = loadStudentProfiles(store.users)
+
+
 const persistStore = () => {
   ensureDataDir()
   fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8')
 }
+
+normalizeLegacyDemoLogins()
+studentProfiles = loadStudentProfiles(store.users)
 
 const loadProviderSecret = (): ProviderSecret | null => {
   if (!fs.existsSync(providerSecretPath)) return null
@@ -348,6 +525,15 @@ const requireAdmin = (req: AuthedRequest, res: express.Response, next: express.N
   const user = resolveSessionUser(req)
   if (!user || user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Доступ только для администратора.' })
+  }
+  req.user = user
+  return next()
+}
+
+const requireClient = (req: AuthedRequest, res: express.Response, next: express.NextFunction) => {
+  const user = resolveSessionUser(req)
+  if (!user || user.role !== 'client') {
+    return res.status(401).json({ ok: false, error: 'Войдите как ученик, чтобы открыть кабинет.' })
   }
   req.user = user
   return next()
@@ -517,7 +703,7 @@ app.get('/api/auth/me', (req, res) => {
 })
 
 app.post('/api/auth/login', (req, res) => {
-  const login = String(req.body?.login ?? '').trim()
+  const login = String(req.body?.login ?? '').trim().toLowerCase()
   const password = String(req.body?.password ?? '')
   if (!login || !password) {
     return res.status(400).json({ ok: false, error: 'Введите логин и пароль.' })
@@ -547,6 +733,142 @@ app.post('/api/auth/logout', (req, res) => {
   }
   clearCookie(res, cookieName)
   return res.json({ ok: true })
+})
+
+app.get('/api/catalog/programs', (_req, res) => {
+  res.json({ ok: true, programs: programCatalog })
+})
+
+app.get('/api/student/me', requireClient, (req: AuthedRequest, res) => {
+  const profile = studentProfiles.find((item) => item.userId === req.user!.id)
+  if (!profile) return res.status(404).json({ ok: false, error: 'Профиль ученика не найден.' })
+
+  res.json({
+    ok: true,
+    student: profile,
+    programs: programCatalog,
+    highlights: [
+      'Следующий дедлайн: финализировать мини-проект модуля.',
+      'Рекомендация: 2 короткие сессии практики в неделю.',
+      'Фокус недели: повторить базовые функции и условные конструкции.',
+    ],
+  })
+})
+
+app.get('/api/admin/students', requireAdmin, (_req, res) => {
+  const students = studentProfiles
+    .map((student) => {
+      const user = store.users.find((item) => item.id === student.userId)
+      return { ...student, login: user?.login ?? '' }
+    })
+    .sort((a, b) => (a.updatedAt > b.updatedAt ? -1 : 1))
+
+  res.json({ ok: true, students })
+})
+
+app.get('/api/admin/students/:id/history', requireAdmin, (req, res) => {
+  const student = studentProfiles.find((item) => item.id === req.params.id)
+  if (!student) return res.status(404).json({ ok: false, error: 'Ученик не найден.' })
+
+  const history: StudentHistoryItem[] = store.audit
+    .filter((item) => item.objectId === student.id && item.action.startsWith('student.'))
+    .map((item) => ({
+      id: item.id,
+      studentId: student.id,
+      actorLogin: store.users.find((user) => user.id === item.actorId)?.login ?? 'unknown',
+      action: item.action,
+      createdAt: item.createdAt,
+    }))
+    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+
+  res.json({ ok: true, history })
+})
+
+app.post('/api/admin/students', requireAdmin, (req: AuthedRequest, res) => {
+  const login = String(req.body?.login ?? '').trim().toLowerCase()
+  const password = String(req.body?.password ?? '')
+  const fullName = String(req.body?.fullName ?? '').trim()
+  const legalRepresentative = String(req.body?.legalRepresentative ?? '').trim()
+  const email = String(req.body?.email ?? '').trim()
+  const contacts = String(req.body?.contacts ?? '').trim()
+
+  if (!login || !password || !fullName) {
+    return res.status(400).json({ ok: false, error: 'Заполните логин, пароль и имя ученика.' })
+  }
+  if (store.users.some((item) => item.login === login)) {
+    return res.status(409).json({ ok: false, error: 'Логин уже используется.' })
+  }
+
+  const user: User = {
+    id: randomId(8),
+    login,
+    passwordHash: hashPassword(password),
+    role: 'client',
+    isTestAccount: true,
+    createdAt: nowIso(),
+  }
+  store.users.push(user)
+
+  const moduleProgress = normalizeModuleProgress([])
+
+  const student: StudentProfile = {
+    id: randomId(8),
+    userId: user.id,
+    nickname: login,
+    fullName,
+    legalRepresentative: legalRepresentative || 'Не указано',
+    email: email || `${login}@example.test`,
+    contacts: contacts || 'Не указано',
+    progressPercent: 0,
+    progressNote: `Пройдено 0 из ${moduleProgress.length} модулей.`,
+    attentionNote: 'Нет замечаний.',
+    moduleProgress,
+    updatedAt: nowIso(),
+  }
+
+  studentProfiles.push(student)
+  persistStore()
+  persistStudentProfiles()
+  addAudit(req.user!.id, 'student.create', student.id)
+  res.status(201).json({ ok: true, student })
+})
+
+app.patch('/api/admin/students/:id', requireAdmin, (req: AuthedRequest, res) => {
+  const student = studentProfiles.find((item) => item.id === req.params.id)
+  if (!student) return res.status(404).json({ ok: false, error: 'Ученик не найден.' })
+
+  const user = store.users.find((item) => item.id === student.userId)
+  if (!user) return res.status(404).json({ ok: false, error: 'Учётная запись ученика не найдена.' })
+
+  const nextLogin = req.body?.login ? String(req.body.login).trim().toLowerCase() : user.login
+  if (nextLogin !== user.login && store.users.some((item) => item.login === nextLogin)) {
+    return res.status(409).json({ ok: false, error: 'Такой логин уже существует.' })
+  }
+
+  user.login = nextLogin
+  if (req.body?.newPassword) user.passwordHash = hashPassword(String(req.body.newPassword))
+
+  student.nickname = String(req.body?.nickname ?? student.nickname)
+  student.fullName = String(req.body?.fullName ?? student.fullName)
+  student.legalRepresentative = String(req.body?.legalRepresentative ?? student.legalRepresentative)
+  student.email = String(req.body?.email ?? student.email)
+  student.contacts = String(req.body?.contacts ?? student.contacts)
+  student.moduleProgress = normalizeModuleProgress(req.body?.moduleProgress ?? student.moduleProgress)
+
+  const percentFromModules = progressFromModules(student.moduleProgress)
+  const manualPercent = Math.max(0, Math.min(100, Number(req.body?.progressPercent ?? percentFromModules)))
+  student.progressPercent = req.body?.moduleProgress ? percentFromModules : manualPercent
+
+  const modulesDone = student.moduleProgress.filter((item) => item.completed).length
+  const defaultProgressNote = `Пройдено ${modulesDone} из ${student.moduleProgress.length} модулей.`
+  student.progressNote = String(req.body?.progressNote ?? defaultProgressNote)
+  student.attentionNote = String(req.body?.attentionNote ?? student.attentionNote)
+  student.updatedAt = nowIso()
+
+  persistStore()
+  persistStudentProfiles()
+  addAudit(req.user!.id, 'student.update', student.id)
+  res.json({ ok: true, student, login: user.login })
 })
 
 app.get('/api/admin/overview', requireAdmin, (req: AuthedRequest, res) => {
@@ -873,3 +1195,15 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`AI-da-school API: http://localhost:${port}`)
 })
+
+
+
+
+
+
+
+
+
+
+
+
