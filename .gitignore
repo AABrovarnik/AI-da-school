@@ -6,3 +6,6 @@ dist-server/
 !.env.example
 *.log
 .DS_Store
+.obsidian/workspace.json
+.obsidian/cache/
+.trash/
